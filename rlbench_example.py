@@ -13,6 +13,12 @@ from pyrep.const import ConfigurationPathAlgorithms as Algos
 import pprint
 import time
 
+import torch
+from pose_estimator import net
+
+
+
+
 def skew(x):
     return np.array([[0, -x[2], x[1]],
                     [x[2], 0, -x[0]],
@@ -78,6 +84,28 @@ class NoisyObjectPoseSensor:
         for obj in objs:
             name = obj.get_name()
             bbox = obj.get_bbox
+            
+class VisionObjectPoseSensor:
+    
+    def __init__(self):
+        
+        self.model = net()
+        self.model.load_state_dict(torch.load("best_model.pth"))
+        
+    def inferPose(self, image_wrist, image_ls, image_rs):
+        
+        image_wrist = torch.from_numpy(image_wrist).float().permute(2,0,1).unsqueeze(0)
+        image_ls = torch.from_numpy(image_ls).float().permute(2,0,1).unsqueeze(0)
+        image_rs = torch.from_numpy(image_rs).float().permute(2,0,1).unsqueeze(0)
+        
+        predictions = self.model(image_wrist, image_ls, image_rs).data.cpu().numpy()
+        
+        return predictions[:3], predictions[3:6], predictions[6:]
+        
+        
+        
+        
+        
 
 
 if __name__ == "__main__":
@@ -94,9 +122,17 @@ if __name__ == "__main__":
     ### Create Agent: TODO
     agent = RandomAgent()
     
+    visionPoseEstimator = VisionObjectPoseSensor()
+    
     while True:
         ### Reset the task
         descriptions, obs = task.reset()
+        
+        wrist_rgb = obs.wrist_rgb
+        ls_rgb = obs.left_shoulder_rgb
+        rs_rgb = obs.right_shoulder_rgb
+        
+        crackers_gp, soup_gp, tuna_gp = visionPoseEstimator.inferPose(wrist_rgb, ls_rgb, rs_rgb)
         
         ### Create Perception/Sensing Module
         obj_pose_sensor = NoisyObjectPoseSensor(env)
@@ -105,28 +141,28 @@ if __name__ == "__main__":
         poses = obj_pose_sensor.get_poses()
         # pprint.pprint(poses)
         # brak
-        target_pose = poses['soup_grasp_point']
+        target_pose = poses['crackers_grasp_point']
         
-        print("Going Down")
-        ### Go Down
-        req_position = env._robot.arm.get_tip().get_position()
-        req_orientation = env._robot.arm.get_tip().get_orientation()
-        req_position[2] -= 0.45
-        path = env._robot.arm.get_linear_path(req_position, req_orientation) 
-        path = path._path_points.reshape(-1, path._num_joints)
+        # print("Going Down")
+        # ### Go Down
+        # req_position = env._robot.arm.get_tip().get_position()
+        # req_orientation = env._robot.arm.get_tip().get_orientation()
+        # req_position[2] -= 0.45
+        # path = env._robot.arm.get_linear_path(req_position, req_orientation) 
+        # path = path._path_points.reshape(-1, path._num_joints)
         
-        for i in range(len(path)):
+        # for i in range(len(path)):
             
-            action = list(path[i]) + [0.5]
-            obs, reward, terminate = task.step(action)
+        #     action = list(path[i]) + [0.5]
+        #     obs, reward, terminate = task.step(action)
         
         ### Use the in-built path planner to plan a path to the target object without collisions
         path = None
         target_object = None
         objs = env._scene._active_task.get_base().get_objects_in_tree(exclude_base=True, first_generation_only=False)
         for obj in objs:
-            if(obj.get_name() == "soup_grasp_point"):
-                req_position = obj.get_position()
+            if(obj.get_name() == "crackers_grasp_point"):
+                req_position = crackers_gp#obj.get_position()
                 req_orientation = obj.get_orientation()*-1
                 req_position[2] += 0.1
                 path = env._robot.arm.get_path(req_position, req_orientation, trials=10000) 
