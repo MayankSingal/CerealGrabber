@@ -13,9 +13,6 @@ from pyrep.const import ConfigurationPathAlgorithms as Algos
 import pprint
 import time
 
-import torch
-from pose_estimator import net
-
 
 
 def skew(x):
@@ -144,7 +141,7 @@ class RobotController:
             print("Planning, with collision checks")
         
         path = None
-        if(position.all()==None and orientation.all()==None and gripper_state==None):
+        if(position is None and orientation is None and gripper_state is None):
             print("No change in robot state requested.")
             return
         elif(orientation.all()==None and gripper_state==None):
