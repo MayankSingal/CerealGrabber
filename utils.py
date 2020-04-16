@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+import math
 from quaternion import from_rotation_matrix, quaternion
 
 from rlbench.environment import Environment
@@ -32,6 +33,31 @@ def sample_normal_pose(pos_scale, rot_scale):
     quat_wxyz = from_rotation_matrix(R)
 
     return pos, quat_wxyz
+
+
+
+def rotation_transform(axis, angle, mode ="degree"):
+
+    if mode == "degree":
+        angle=math.radians(angle)
+
+
+    cos = math.cos(angle)
+    sin = math.sin(angle)
+
+    if axis == "x":
+        rot = np.array([[1,0,0],[0,cos,-sin],[0,sin,cos]])
+    elif axis =="y":
+        rot = np.array([[cos,0,sin],[0,1,0],[-sin,0,cos]])
+    elif axis == "z":
+        rot = np.array([[cos,-sin,0],[sin,cos,0],[0,0,1]])
+    
+    return rot
+
+
+
+
+
 
 
 class RandomAgent:
@@ -167,6 +193,13 @@ class RobotController:
         for i in range(len(path)):
 
             action = list(path[i]) + [1]
+            obs, reward, terminate = self.task.step(action)
+
+        return path
+    
+    def move_with_path(self,path, gripper_state = 1):
+        for i in range(len(path)):
+            action = list(path[i]) + [gripper_state]
             obs, reward, terminate = self.task.step(action)
 
     
