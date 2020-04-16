@@ -10,7 +10,6 @@ from rlbench.tasks import *
 
 from pyrep.const import ConfigurationPathAlgorithms as Algos
 
-
 import pprint
 import time
 
@@ -136,27 +135,98 @@ class RobotController:
     def __init__(self, env, task):
         self.env = env
         self.task = task
+        self.gripper_state = 1
         
-    def get_pose_from_simulation(self, name):
+    def get_pose_and_object_from_simulation(self, name):
         
+        target_obj = None
         objs = self.env._scene._active_task.get_base().get_objects_in_tree(exclude_base=True, first_generation_only=False)
         for obj in objs:
             if(obj.get_name() == name):
                 req_position = obj.get_position()
                 req_orientation = obj.get_orientation()
+                target_obj = obj
                 break
             
-        return req_position, req_orientation
-    
-    def actuate_gripper(self, gripper_state=0):
+        return req_position, req_orientation, target_obj
+            
+    def actuate_gripper(self, gripper_state=None):
 
         joint_positions = self.env._robot.arm.get_joint_positions()
+        
+        if(gripper_state is None):
+            gripper = self.gripper_state
+        else:
+            gripper = gripper_state
+            self.gripper_state = gripper_state
         
         for i in range(25):
             action = list(joint_positions) + [gripper_state]
             obs, reward, terminate = self.task.step(action)
-                    
+            
+        return None, obs
+    
+            
+    
+    def translate(self, x=0, y=0, z=0, gripper_state=None, ignore_collisions=False):
         
+        if(x == 0 and y == 0 and z == 0):
+            print("No position change requested in translate.")
+            return
+        
+        tip_position = self.env._robot.arm.get_tip().get_position()
+        tip_orientation = self.env._robot.arm.get_tip().get_orientation()
+        
+        requested_position = tip_position + np.array([x,y,z])
+        path = self.env._robot.arm.get_path(requested_position, tip_orientation, ignore_collisions=ignore_collisions)
+        path = path._path_points.reshape(-1, path._num_joints)
+                
+        if(gripper_state is None):
+            gripper = self.gripper_state
+        else:
+            gripper = gripper_state
+            self.gripper_state = gripper_state
+        
+        for i in range(len(path)):
+
+            action = list(path[i]) + [gripper]
+            obs, reward, terminate = self.task.step(action)
+            
+        return path, obs
+            
+    
+    def rotate_to(self, orientation=None, gripper_state=None, ignore_collisions=False):
+        if(orientation is None):
+            print("No rotation requested.")
+            return
+        print("Rotating")
+        tip_position = self.env._robot.arm.get_tip().get_position()
+        tip_orientation = self.env._robot.arm.get_tip().get_orientation()
+        
+        requested_orientation = orientation
+       
+        path = self.env._robot.arm.get_path(tip_position, requested_orientation, ignore_collisions=ignore_collisions, trials=1000)
+        path = path._path_points.reshape(-1, path._num_joints)
+       
+        if(gripper_state is None):
+            gripper = self.gripper_state
+        else:
+            gripper = gripper_state
+            self.gripper_state = gripper_state
+            
+        for i in range(len(path)):
+
+            action = list(path[i]) + [gripper]
+            obs, reward, terminate = self.task.step(action)
+            
+        return path, obs
+            
+       
+
+        
+        
+            
+                
         
     def move(self, position=None, orientation=None, gripper_state=None, ignore_collisions=False):
         
@@ -167,16 +237,11 @@ class RobotController:
             print("Planning, with collision checks")
         
         path = None
-        if(position is None and orientation is None and gripper_state is None):
-            print("No change in robot state requested.")
+        
+        if(position is None or orientation is None):
+            print("Position or orientation not specified. Check inputs.")
             return
-        elif(orientation.all()==None and gripper_state==None):
-            print("Pure translation not implemented yet.")
-            return
-        elif(position.all()==None and gripper_state==None):
-            print("Pure rotation not implemented yet.")
-            return
-        elif(gripper_state==None):
+        elif(gripper_state is None):
             print("Moving. Gripper defaults to open (1)")
             path = self.env._robot.arm.get_path(position, orientation, ignore_collisions=ignore_collisions)
             path = path._path_points.reshape(-1, path._num_joints)
@@ -185,14 +250,19 @@ class RobotController:
             path = self.env._robot.arm.get_path(position, orientation, ignore_collisions=ignore_collisions)
             path = path._path_points.reshape(-1, path._num_joints)
             
-        if(path.all() == None):
+        if(path is None):
             print("No path received..")
             return
+        if(gripper_state is None):
+            gripper = self.gripper_state
+        else:
+            gripper = gripper_state
+            self.gripper_state = gripper_state
         
         ## Execute the planned path
         for i in range(len(path)):
 
-            action = list(path[i]) + [1]
+            action = list(path[i]) + [gripper]
             obs, reward, terminate = self.task.step(action)
 
         return path
@@ -202,5 +272,6 @@ class RobotController:
             action = list(path[i]) + [gripper_state]
             obs, reward, terminate = self.task.step(action)
 
+        return path, obs
     
     
