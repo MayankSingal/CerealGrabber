@@ -223,8 +223,7 @@ class RobotController:
             
        
 
-        
-        
+
             
                 
         
@@ -257,7 +256,7 @@ class RobotController:
             gripper = self.gripper_state
         else:
             gripper = gripper_state
-            self.gripper_state = gripper_state
+            # self.gripper_state = gripper_state
         
         ## Execute the planned path
         for i in range(len(path)):
