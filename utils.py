@@ -109,6 +109,7 @@ class RobotController:
     def __init__(self, env, task):
         self.env = env
         self.task = task
+        self.gripper_state = 1
         
     def get_pose_and_object_from_simulation(self, name):
         
@@ -123,17 +124,25 @@ class RobotController:
             
         return req_position, req_orientation, target_obj
             
-    def actuate_gripper(self, gripper_state=0):
+    def actuate_gripper(self, gripper_state=None):
 
         joint_positions = self.env._robot.arm.get_joint_positions()
+        
+        if(gripper_state is None):
+            gripper = self.gripper_state
+        else:
+            gripper = gripper_state
+            self.gripper_state = gripper_state
         
         for i in range(25):
             action = list(joint_positions) + [gripper_state]
             obs, reward, terminate = self.task.step(action)
+            
+        return None, obs
     
             
     
-    def translate(self, x=0, y=0, z=0, gripper_state=1, ignore_collisions=False):
+    def translate(self, x=0, y=0, z=0, gripper_state=None, ignore_collisions=False):
         
         if(x == 0 and y == 0 and z == 0):
             print("No position change requested in translate.")
@@ -146,18 +155,21 @@ class RobotController:
         path = self.env._robot.arm.get_path(requested_position, tip_orientation, ignore_collisions=ignore_collisions)
         path = path._path_points.reshape(-1, path._num_joints)
                 
-                
-        gripper = gripper_state
+        if(gripper_state is None):
+            gripper = self.gripper_state
+        else:
+            gripper = gripper_state
+            self.gripper_state = gripper_state
         
         for i in range(len(path)):
 
             action = list(path[i]) + [gripper]
             obs, reward, terminate = self.task.step(action)
             
-        return path
+        return path, obs
             
     
-    def rotate_to(self, orientation=None, gripper_state=1, ignore_collisions=False):
+    def rotate_to(self, orientation=None, gripper_state=None, ignore_collisions=False):
         if(orientation is None):
             print("No rotation requested.")
             return
@@ -170,13 +182,18 @@ class RobotController:
         path = self.env._robot.arm.get_path(tip_position, requested_orientation, ignore_collisions=ignore_collisions, trials=1000)
         path = path._path_points.reshape(-1, path._num_joints)
        
-        gripper = gripper_state
+        if(gripper_state is None):
+            gripper = self.gripper_state
+        else:
+            gripper = gripper_state
+            self.gripper_state = gripper_state
+            
         for i in range(len(path)):
 
             action = list(path[i]) + [gripper]
             obs, reward, terminate = self.task.step(action)
             
-        return path
+        return path, obs
             
        
 
@@ -185,7 +202,7 @@ class RobotController:
             
                 
         
-    def move(self, position=None, orientation=None, gripper_state=1, ignore_collisions=False):
+    def move(self, position=None, orientation=None, gripper_state=None, ignore_collisions=False):
         
         
         if(ignore_collisions == True):
@@ -210,8 +227,11 @@ class RobotController:
         if(path is None):
             print("No path received..")
             return
-        
-        gripper = gripper_state
+        if(gripper_state is None):
+            gripper = self.gripper_state
+        else:
+            gripper = gripper_state
+            self.gripper_state = gripper_state
         
         ## Execute the planned path
         for i in range(len(path)):
@@ -219,6 +239,6 @@ class RobotController:
             action = list(path[i]) + [gripper]
             obs, reward, terminate = self.task.step(action)
 
-        return path
+        return path, obs
     
     

@@ -45,13 +45,17 @@ if __name__ == "__main__":
     mustard_orientation = [ 7.07037210e-01,  7.07173109e-01, -6.37740828e-04, -2.06269184e-03]
     mustard_position = [ 0.31035879, -0.12106754,  0.90185165]
 
+
     
     
     
     ######################################### Motion Planning ##########################################################
     descriptions, obs = task.reset()
     
-
+    ### Sense Positions
+    crackers_position, crackers_orientation, crackers_obj = robot_controller.get_pose_and_object_from_simulation("mustard_grasp_point")
+    crackers_rot = R.from_euler('xyz', crackers_orientation)
+    
 
     ## Motion 1
     ## (1) Sense mustard_grasp_point location. (2) Move gripper to a point 0.1m over mustard_grasp_point, while making it remain vertical.
@@ -68,12 +72,12 @@ if __name__ == "__main__":
     ## (1) Move downwards. (2) Close gripper
     
     #(1)
-    robot_controller.translate(z=-0.1)
+    robot_controller.translate(z=-0.1, ignore_collisions=True)
     
     #(2)
     robot_controller.actuate_gripper(0)
     
-
+    print("Motion2 Done")
     ## Motion 3
     # (1) Move upwards. (2) Move near mustard reset position
     
@@ -85,22 +89,34 @@ if __name__ == "__main__":
     req_position[2] += 0.3
     req_position[0] -= 0.3
     robot_controller.move(req_position, gripper_vertical_orientation, gripper_state=0)
-    
+    print("Motion3 Done")
+
     
     ## Motion 4
     # (1) Rotate grasped object to vertical orientation.
     
-    required_rotation = None   
-    mustard_quat = R.from_quat(list(mustard_obj.get_quaternion()))
-    desired_mustard_quat = R.from_quat(list(mustard_orientation))
-    required_rotation = mustard_quat*desired_mustard_quat.inv()
+    # required_rotation = None   
+    # mustard_quat = R.from_quat(list(mustard_obj.get_quaternion()))
+    # desired_mustard_quat = R.from_quat(list(mustard_orientation))
+    # #required_rotation = mustard_quat*desired_mustard_quat.inv()
+    # required_rotation = desired_mustard_quat * mustard_quat.inv()
+    
+    # end_effector_orintation = R.from_euler('xyz', env._robot.arm.get_tip().get_orientation())
+    # new_orientation = required_rotation * end_effector_orintation
+    # new_orientation = list(new_orientation.as_euler('xyz'))
+    
+    mustard_rot = R.from_euler('xyz', mustard_obj.get_orientation())
+    desired_mustard_rot = R.from_euler('xyz', [0,0,0])#crackers_rot
+    req_rotation = mustard_rot * desired_mustard_rot.inv()
     
     end_effector_orintation = R.from_euler('xyz', env._robot.arm.get_tip().get_orientation())
-    new_orientation = end_effector_orintation * required_rotation
+    new_orientation = req_rotation * end_effector_orintation
     new_orientation = list(new_orientation.as_euler('xyz'))
     
-    robot_controller.rotate_to(new_orientation, gripper_state=0, ignore_collisions=True)
-    
+
+    robot_controller.rotate_to(new_orientation, gripper_state=0, ignore_collisions=False)
+    print("Motion4 Done")
+
   
     ## Motion 5
     # (1) Move over mustard reset position, (2) Double down on object orientation
@@ -122,7 +138,8 @@ if __name__ == "__main__":
     new_orientation = list(new_orientation.as_euler('xyz'))
     
     robot_controller.rotate_to(new_orientation, gripper_state=0, ignore_collisions=True)
-    
+    print("Motion5 Done")
+
     
     ## Motion 6
     # (1) Move Down. (2) Drop Object
