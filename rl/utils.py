@@ -147,7 +147,6 @@ class RobotController:
                 req_orientation = obj.get_orientation()
                 target_obj = obj
                 break
-            
         return req_position, req_orientation, target_obj
             
     def actuate_gripper(self, gripper_state=None):
@@ -165,6 +164,21 @@ class RobotController:
             obs, reward, terminate = self.task.step(action)
             
         return None, obs
+
+    
+    def get_arm_tip_pose(self):
+        tip_position = list(self.env._robot.arm.get_tip().get_position())
+        tip_orientation = list(self.env._robot.arm.get_tip().get_orientation())
+
+        tip_pose = tip_position + tip_orientation
+        return tip_pose
+   
+    def get_grasp_state(self):
+        force_reading = np.sum(np.abs(self.env._robot.gripper.get_touch_sensor_forces()))
+        if(force_reading > 0.2):
+            return True
+        else:
+            return False
     
             
     
@@ -185,7 +199,7 @@ class RobotController:
             gripper = self.gripper_state
         else:
             gripper = gripper_state
-            self.gripper_state = gripper_state
+            # self.gripper_state = gripper_state
         
         for i in range(len(path)):
 
@@ -212,7 +226,7 @@ class RobotController:
             gripper = self.gripper_state
         else:
             gripper = gripper_state
-            self.gripper_state = gripper_state
+            # self.gripper_state = gripper_state
             
         for i in range(len(path)):
 
@@ -222,7 +236,7 @@ class RobotController:
         return path, obs
             
        
-
+  
 
             
                 
@@ -243,10 +257,12 @@ class RobotController:
         elif(gripper_state is None):
             print("Moving. Gripper defaults to open (1)")
             path = self.env._robot.arm.get_path(position, orientation, ignore_collisions=ignore_collisions)
+            path._num_joints = 7
             path = path._path_points.reshape(-1, path._num_joints)
         else:
             print("Moving to desired position, orientation and gripper state")
             path = self.env._robot.arm.get_path(position, orientation, ignore_collisions=ignore_collisions)
+            path._num_joints = 7
             path = path._path_points.reshape(-1, path._num_joints)
             
         if(path is None):
@@ -260,8 +276,8 @@ class RobotController:
         
         ## Execute the planned path
         for i in range(len(path)):
-
             action = list(path[i]) + [gripper]
+            print("planned action", action)
             obs, reward, terminate = self.task.step(action)
 
         return path
